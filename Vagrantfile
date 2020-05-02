@@ -1,24 +1,63 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-Vagrant.configure("2") do |config|
-  
-  # Box Settings
-  config.vm.box = "ubuntu/trusty64"
+require 'json'
+require 'yaml'
 
-  # Provider Settings
-  config.vm.provider "virtualbox" do |vb|
-    # vb.memory = 2048
-    # vb.cpus = 4
-  end
+VAGRANTFILE_API_VERSION ||= "2"
+confDir = $confDir ||= File.expand_path(File.dirname(__FILE__))
 
-  # Network Settings
-  # config.vm.network "forwarded_port", guest: 80, host: 8080
-  # config.vm.network "forwarded_port", guest: 80, host: 8080, host_ip: "127.0.0.1"
-  config.vm.network "private_network", ip: "192.168.33.10"
+homesteadYamlPath = confDir + "/Homestead.yaml"
+homesteadJsonPath = confDir + "/Homestead.json"
+afterScriptPath = confDir + "/after.sh"
+customizationScriptPath = confDir + "/user-customizations.sh"
+nvmScriptPath = confDir + "/nvmScript.sh"
+aliasesPath = confDir + "/aliases"
 
-  # Folder Settings
-  config.vm.synced_folder ".", "/var/www/html", :nfs => { :mount_options => ["dmode=777", "fmode=666"] }
-  
-  config.vm.provision "shell", path: "bootstrap.sh"
+require File.expand_path(File.dirname(__FILE__) + '/scripts/homestead.rb')
+
+Vagrant.require_version '>= 2.2.4'
+
+Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
+    if File.exist? aliasesPath then
+        config.vm.provision "file", source: aliasesPath, destination: "/tmp/bash_aliases"
+        config.vm.provision "shell" do |s|
+            s.inline = "awk '{ sub(\"\r$\", \"\"); print }' /tmp/bash_aliases > /home/vagrant/.bash_aliases && chown vagrant:vagrant /home/vagrant/.bash_aliases"
+        end
+    end
+
+    if File.exist? homesteadYamlPath then
+        settings = YAML::load(File.read(homesteadYamlPath))
+    elsif File.exist? homesteadJsonPath then
+        settings = JSON::parse(File.read(homesteadJsonPath))
+    else
+        abort "Homestead settings file not found in #{confDir}"
+    end
+
+    Homestead.configure(config, settings)
+
+    if File.exist? afterScriptPath then
+        config.vm.provision "shell", path: afterScriptPath, privileged: false, keep_color: true
+    end
+
+    if File.exist? nvmScriptPath then
+        config.vm.provision "shell", path: nvmScriptPath, privileged: false, keep_color: true
+    end
+
+    if File.exist? customizationScriptPath then
+        config.vm.provision "shell", path: customizationScriptPath, privileged: false, keep_color: true
+    end
+
+    if Vagrant.has_plugin?('vagrant-hostsupdater')
+        config.hostsupdater.remove_on_suspend = false
+        config.hostsupdater.aliases = settings['sites'].map { |site| site['map'] }
+    elsif Vagrant.has_plugin?('vagrant-hostmanager')
+        config.hostmanager.enabled = true
+        config.hostmanager.manage_host = true
+        config.hostmanager.aliases = settings['sites'].map { |site| site['map'] }
+    end
+
+    if Vagrant.has_plugin?('vagrant-notify-forwarder')
+        config.notify_forwarder.enable = true
+    end
 end
