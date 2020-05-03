@@ -11,7 +11,7 @@ homesteadYamlPath = confDir + "/Homestead.yaml"
 homesteadJsonPath = confDir + "/Homestead.json"
 afterScriptPath = confDir + "/after.sh"
 customizationScriptPath = confDir + "/user-customizations.sh"
-nvmScriptPath = confDir + "/nvmScript.sh"
+nvmScriptPath = confDir + "/resources/nvmScript.sh"
 aliasesPath = confDir + "/aliases"
 
 require File.expand_path(File.dirname(__FILE__) + '/scripts/homestead.rb')
@@ -42,6 +42,8 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
     if File.exist? nvmScriptPath then
         config.vm.provision "shell", path: nvmScriptPath, privileged: false, keep_color: true
+    else
+        abort "nvm script file not found in #{nvmScriptPath}"
     end
 
     if File.exist? customizationScriptPath then
