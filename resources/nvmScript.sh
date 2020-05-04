@@ -9,6 +9,9 @@ $userScript = <<SCRIPT
   export NVM_DIR="/home/vagrant/.nvm"
   [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"  # This loads nvm
 
+  export NVM_DIR=~/.nvm
+  source ~/.nvm/nvm.sh
+
   # Install a node and alias
   nvm install 0.10.33
   nvm alias default 0.10.33
